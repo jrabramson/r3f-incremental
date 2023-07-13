@@ -14,12 +14,12 @@ function Sphere() {
   })
 
   return (
-    <PivotControls anchor={[0, 0, 0]} depthTest={false} visible={gizmo} ref={pivotRef}>
-      <mesh position={position} ref={sphereRef} castShadow>
-        <sphereGeometry args={[1, 30, 30]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-    </PivotControls>
+
+    <mesh position={position} ref={sphereRef} castShadow>
+      <sphereGeometry args={[1, 30, 30]} />
+      <meshStandardMaterial color={color} />
+    </mesh>
+
   )
 }
 
