@@ -1,13 +1,28 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Leva } from 'leva'
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
-import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
-import { Scene } from './Scene'
+import { ACESFilmicToneMapping, SRGBColorSpace, Scene } from 'three'
+import { Scene as Game } from './Scene'
 import MainMenu from './MainMenu'
-import { KeyboardControls } from '@react-three/drei'
+import { KeyboardControls, PerspectiveCamera } from '@react-three/drei'
+import Effects from './Effects'
 
 import './styles/main.css'
+import HUD from './HUD'
+
+function Content() {
+  const scene = useRef<Scene | null>(null)
+  const { camera } = useThree()
+
+  const { size } = useThree()
+  // useEffect(() => void setDefaultCamera(camera.current), [])
+  useFrame(() => camera?.updateMatrixWorld())
+  useFrame(({ gl }) => void ((gl.autoClear = true), gl.render(scene.current!, camera)), 100)
+  return <scene ref={scene}>
+    <Game />
+  </scene>
+}
 
 function Main() {
   const [showMenu, setShowMenu] = React.useState(false)
@@ -38,9 +53,12 @@ function Main() {
           { name: "left", keys: ["ArrowLeft", "a", "A"] },
           { name: "right", keys: ["ArrowRight", "d", "D"] },
           { name: "jump", keys: ["Space"] },
+          { name: "swap", keys: ["Q", "q"] },
+          { name: "weapon1", keys: ["1"] },
+          { name: "weapon2", keys: ["2"] },
         ]}>
         <Canvas
-          dpr={[1, 2]}
+          dpr={window.devicePixelRatio}
           gl={{
             antialias: true,
             toneMapping: ACESFilmicToneMapping,
@@ -53,10 +71,23 @@ function Main() {
             position: [3, 2, 9],
           }}
           shadows
+          raycaster={{ params: { Line: { threshold: 0.15 } } }}
         >
-          {showMenu ? <MainMenu onClickPlay={() => newGame()} /> : <Scene />}
+          {showMenu ? <MainMenu onClickPlay={() => newGame()} /> : <>
+            {/* <PerspectiveCamera
+              ref={camera}
+              aspect={size.width / size.height}
+              // radius={(size.width + size.height) / 4}
+              onUpdate={self => self.updateProjectionMatrix()}
+              makeDefault={true}
+            /> */}
+            <Content />
+            <HUD />
+          </>}
+          {/* <Effects /> */}
         </Canvas>
         {!showMenu ? <div className='ui'>ui</div> : null}
+        {!showMenu && <div className="dot" />}
       </KeyboardControls>
     </div>
   )
