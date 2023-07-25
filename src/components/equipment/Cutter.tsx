@@ -1,13 +1,10 @@
-import { useFrame, useThree } from "@react-three/fiber"
-import { useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from "react"
-import { subscribe, useSnapshot } from "valtio"
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react"
+import { useSnapshot } from "valtio"
 import * as THREE from 'three'
-import { Line2 } from 'three/examples/jsm/lines/Line2'
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial'
 
-import { setCutProgress, setTarget, state } from "../../state"
+import { setCutProgress, globalState } from "../../state"
 import { EquipRef } from "../../types"
-import { Cylinder, Line } from "@react-three/drei"
+import { Cylinder } from "@react-three/drei"
 
 type CutterProps = {
     active: boolean
@@ -20,7 +17,7 @@ const Cutter = forwardRef<EquipRef, CutterProps>(({ active }, ref) => {
     const [isCutting, setIsCutting] = useState<boolean>(false)
     const [num, setNum] = useState<number>(2);
 
-    const { target, targetMesh } = useSnapshot(state)
+    const { target, parent } = useSnapshot(globalState)
 
     const cut = () => {
         if (num === 0) {
@@ -31,15 +28,15 @@ const Cutter = forwardRef<EquipRef, CutterProps>(({ active }, ref) => {
     }
 
     useEffect(() => {
-        if (!isCutting || !targetMesh?.includes('cuttable')) return;
+        if (!isCutting || !target?.includes('cuttable')) return;
         intervalRef.current = setInterval(cut, 100);
 
         return () => clearInterval(intervalRef.current);
-    }, [isCutting, num, targetMesh]);
+    }, [isCutting, num, target]);
 
     useEffect(() => {
-        setCutProgress(num);
-    }, [num]);
+        parent && setCutProgress(parent, num);
+    }, [num, parent]);
 
     const onMouseDown = (e: MouseEvent) => {
         setIsCutting(true)

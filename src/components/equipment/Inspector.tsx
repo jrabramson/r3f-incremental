@@ -1,7 +1,7 @@
 import { useThree } from "@react-three/fiber"
-import { useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from "react"
-import { subscribe, useSnapshot } from "valtio"
-import { setTarget, state } from "../../state"
+import { useRef, useImperativeHandle, forwardRef } from "react"
+import { useSnapshot } from "valtio"
+import { setInspecting, globalState } from "../../state"
 import * as THREE from 'three'
 import { EquipRef } from "../../types"
 
@@ -13,38 +13,23 @@ type InspectorProps = {
 
 const Inspector = forwardRef<EquipRef, InspectorProps>(({ onLockTarget, onUnlockTarget, active }, ref) => {
     const groupRef = useRef<THREE.Group>(null);
-    const [isInspecting, setIsInspecting] = useState<boolean>(false)
 
-    const { scene, camera } = useThree()
-
-    const { target, targetMesh } = useSnapshot(state)
+    const { target } = useSnapshot(globalState)
 
     const onMouseDown = (e: MouseEvent) => {
-        if (!targetMesh) return;
+        if (!target) return;
 
         onLockTarget()
-        setIsInspecting(true)
+        setInspecting(true)
     }
 
     const onMouseUp = (e: MouseEvent) => {
         onUnlockTarget()
-        setIsInspecting(false)
+        setInspecting(false)
     }
 
     const onMouseMove = (e: MouseEvent) => {
-        if (!targetMesh) return;
 
-        if (!isInspecting) return;
-
-        const m = scene.getObjectByName(targetMesh);
-        if (!m) return;
-
-        const vector = new THREE.Vector3();
-        camera.getWorldDirection(vector)
-
-        m.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), e.movementX / 100)
-        // m.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -e.movementY / 100)
-        m.rotateOnWorldAxis(vector.cross(new THREE.Vector3(0, 1, 0)).normalize(), e.movementY / 100)
     }
 
     useImperativeHandle(ref, () => ({
@@ -54,7 +39,7 @@ const Inspector = forwardRef<EquipRef, InspectorProps>(({ onLockTarget, onUnlock
             onMouseUp,
             onMouseMove
         }
-    }), [targetMesh, active, isInspecting]);
+    }), [target, active]);
 
     return active ? (
         <group ref={groupRef}>

@@ -1,19 +1,15 @@
 import * as THREE from "three"
-import * as RAPIER from "@dimforge/rapier3d-compat"
-import { ReactElement, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useFrame, useThree } from "@react-three/fiber"
-import { useKeyboardControls, Hud } from "@react-three/drei"
-import { CapsuleCollider, RigidBody, useRapier, RapierRigidBody, useFixedJoint } from "@react-three/rapier"
+import { useKeyboardControls } from "@react-three/drei"
 
 import Inspector from "./components/equipment/Inspector"
 import Grabber from "./components/equipment/Grabber"
 import { useSnapshot } from "valtio"
-import { setLockCursor, setTarget, state } from "./state"
-import Joint from "./components/Joint"
+import { setLockCursor, setTarget, globalState, setParent } from "./state"
 import { EquipRef } from "./types"
 import Cutter from "./components/equipment/Cutter"
-
-const coords = new THREE.Vector2(-1, -1);
+import { useSphere } from "@react-three/cannon"
 
 const Inventory = () => {
     // lets the Player pick up and store items
@@ -25,6 +21,8 @@ const direction = new THREE.Vector3()
 const frontVector = new THREE.Vector3()
 const sideVector = new THREE.Vector3()
 const rotation = new THREE.Vector3()
+const speed = new THREE.Vector3()
+
 
 type PlayerProps = {
     isFocused?: boolean
@@ -32,21 +30,19 @@ type PlayerProps = {
 }
 
 const Player = ({ isFocused, lerp = THREE.MathUtils.lerp }: PlayerProps) => {
-    const ref = useRef<RapierRigidBody>(null)
     const equipContainerRef = useRef<THREE.Group>(null)
 
     const equipRefs = useRef<EquipRef[] | null[]>([])
+    const velocity = useRef([0, 0, 0])
 
-    // const raycaster = useRef(new THREE.Raycaster());
+    const [ref, api] = useSphere<THREE.Mesh>(() => ({ mass: 1, type: "Dynamic", position: [-2, 0, -2], radius: 0.2 }))
 
     const [equippedIndex, setEquippedIndex] = useState(0)
     const [lockTarget, setLockTarget] = useState<boolean>(false)
 
-    const snap = useSnapshot(state)
+    const { camera, scene } = useThree()
+    const { grabbed, target, isInspecting } = useSnapshot(globalState)
 
-    const { camera, scene, raycaster } = useThree()
-
-    const rapier = useRapier()
     const [subscribeKeys, get] = useKeyboardControls()
 
     const swapWeapon = () => {
@@ -54,7 +50,7 @@ const Player = ({ isFocused, lerp = THREE.MathUtils.lerp }: PlayerProps) => {
     }
 
     useEffect(() => {
-        setTarget(null, null)
+        setTarget(null)
     }, [equippedIndex])
 
     useEffect(() => {
@@ -83,6 +79,8 @@ const Player = ({ isFocused, lerp = THREE.MathUtils.lerp }: PlayerProps) => {
     const onMouseUp = (e: MouseEvent) => {
         equipRefs.current?.[equippedIndex]?.handlers?.onMouseUp?.(e)
     }
+
+    useEffect(() => api.velocity.subscribe((v) => (velocity.current = v)), [])
 
     useEffect(() => {
         window.addEventListener('mousemove', onMouseMove)
@@ -127,61 +125,52 @@ const Player = ({ isFocused, lerp = THREE.MathUtils.lerp }: PlayerProps) => {
     }, [equippedIndex])
 
     useFrame((state) => {
-        const t = state.raycaster?.intersectObjects(scene.children, true)[0].object.name
-        console.log(t.length)
-        t.length ? setTarget(null, state.raycaster?.intersectObjects(scene.children, true)[0].object.name) : setTarget(null, null)
+        if (!grabbed && !isInspecting) {
+            const objects = state.raycaster?.intersectObjects(scene.children, true)
+            const first = objects.find((i) => i.object.name.length > 0)
 
-        if (!ref.current) return
+            if (first?.object.name) {
+                setTarget(first?.object.name)
+                if (first?.object?.parent?.name) {
+                    setParent(first?.object?.parent?.name)
+                }
+            } else {
+                if (!isInspecting) {
+                    setTarget(null)
+                }
+            }
+        }
 
         const { forward, backward, left, right, jump } = get()
-        const velocity = ref.current.linvel()
 
-        // update camera
-        state.camera.position.set(ref.current.translation().x, ref.current.translation().y + 2, ref.current.translation().z)
+        ref.current?.getWorldPosition(camera.position)
+        frontVector.set(0, 0, Number(backward) - Number(forward))
+        sideVector.set(Number(left) - Number(right), 0, 0)
+        direction.subVectors(frontVector, sideVector).normalize().multiplyScalar(SPEED).applyEuler(camera.rotation)
+        speed.fromArray(velocity.current)
 
-        if (lockTarget && snap.target) {
-            // const firstQuaternion = new THREE.Quaternion().copy(state.camera.quaternion);
-            // state.camera.lookAt(new THREE.Vector3(snap.target.translation().x, snap.target.translation().y, snap.target.translation().z))
-            // const quaternion = new THREE.Quaternion().copy(state.camera.quaternion);
-            // state.camera.quaternion.copy(firstQuaternion)
-
-            // // slerp the camera to the target
-            // const target = new THREE.Vector3(snap.target.translation().x, snap.target.translation().y, snap.target.translation().z)
-            // const camera = state.camera.position
-            // const targetDirection = new THREE.Vector3().subVectors(target, camera).normalize()
-            // const cameraDirection = new THREE.Vector3().subVectors(camera, target).normalize()
-            // const angle = targetDirection.angleTo(cameraDirection)
-            // const slerp = lerp(0, angle, 0.1)
-            // // const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3().crossVectors(targetDirection, cameraDirection).normalize(), slerp)
-
-            // state.camera.quaternion.slerpQuaternions(state.camera.quaternion, quaternion, 1.0)
-        }
-
-        // update equipContainerRef
         if (equipContainerRef.current) {
-            // equipContainerRef.current.children[0].rotation.x = lerp(equipContainerRef.current.children[0].rotation.x, Math.sin((velocity.length() > 1) * state.clock.elapsedTime * 10) / 6, 0.1)
-            equipContainerRef.current.rotation.copy(state.camera.rotation)
-            equipContainerRef.current.position.copy(state.camera.position).add(state.camera.getWorldDirection(rotation).multiplyScalar(1))
+            equipContainerRef.current.children[0].position.z = THREE.MathUtils.lerp(
+                equipContainerRef.current.children[0].rotation.x,
+                Math.sin(Number(speed.length() > 1) * state.clock.elapsedTime * 10) / 6,
+                0.1,
+            )
+            equipContainerRef.current?.rotation.copy(state.camera.rotation)
+            equipContainerRef.current?.position.copy(state.camera.position).add(state.camera.getWorldDirection(rotation).multiplyScalar(1))
         }
 
-        // movement
-        frontVector.set(0, 0, +backward - +forward)
-        sideVector.set(+left - +right, 0, 0)
-        direction.subVectors(frontVector, sideVector).normalize().multiplyScalar(SPEED).applyEuler(state.camera.rotation)
-        ref.current.setLinvel({ x: direction.x, y: velocity.y, z: direction.z }, true)
+        if (!lockTarget) {
+            api.velocity.set(direction.x, velocity.current[1], direction.z)
+        }
 
-        // jumping
-        const world = rapier.world
-        const ray = world.castRay(new RAPIER.Ray(ref.current.translation(), { x: 0, y: -1, z: 0 }), 1.75, true)
-        const grounded = ray && ray.collider && Math.abs(ray.toi) <= 1.75
-        if (jump && grounded) ref.current.setLinvel({ x: 0, y: 7.5, z: 0 }, true)
+        if (jump && Math.abs(parseFloat(velocity.current[1].toFixed(2))) < 0.05) {
+            api.velocity.set(velocity.current[0], 10, velocity.current[2])
+        }
     })
 
     return (
         <>
-            <RigidBody scale={0.01} ref={ref} colliders={false} mass={1} type="dynamic" position={[-23, 16, 12]} enabledRotations={[false, false, false]}>
-                <CapsuleCollider scale={0.2} args={[0.2, 0.2]} />
-            </RigidBody>
+            <mesh ref={ref} />
 
             <Inventory />
 

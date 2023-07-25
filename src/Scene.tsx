@@ -1,28 +1,20 @@
-import { OrbitControls, PointerLockControls, TransformControls } from '@react-three/drei'
-import { ThreeEvent, useFrame, useThree } from '@react-three/fiber'
+import { PointerLockControls } from '@react-three/drei'
 import { useControls } from 'leva'
 import { Perf } from 'r3f-perf'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { BoxGeometry, Mesh, MeshBasicMaterial } from 'three'
+import { useEffect, useRef } from 'react'
 import { Cube } from './components/Cube'
 import Structure from './components/Structure'
-import { Sphere } from './components/Sphere'
-import { Physics, RapierRigidBody } from '@react-three/rapier'
+import { Physics } from '@react-three/cannon'
 import Player from './Player'
-import { PointerLockControls as PointerLockControlsImpl, OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import * as THREE from 'three'
+import { PointerLockControls as PointerLockControlsImpl } from 'three-stdlib'
 import { useSnapshot } from 'valtio'
-import { setTarget, state } from './state'
+import { globalState } from './state'
+import Clamp from './components/objects/Clamp'
 
 function Scene() {
   const lockControls = useRef<PointerLockControlsImpl>(null)
-  const orbitControls = useRef<OrbitControlsImpl>(null)
 
-  const snap = useSnapshot(state)
-
-  const [isInspecting, setIsInspecting] = useState<Mesh<BoxGeometry, MeshBasicMaterial> | null>(null)
-
-  const { camera, scene } = useThree()
+  const { target, lockCursor, isInspecting } = useSnapshot(globalState)
 
   const { performance } = useControls('Monitoring', {
     performance: false,
@@ -32,50 +24,21 @@ function Scene() {
     animate: true,
   })
 
-  const cubeRef = useRef<Mesh<BoxGeometry, MeshBasicMaterial>>(null)
-
-  const selected = useMemo(() => {
-    if (snap.target) {
-      return snap.target
-    }
-    return null
-  }, [snap])
-
-  useFrame((_, delta) => {
-    if (animate) {
-      // cubeRef.current!.rotation.y += delta / 3
-    }
-  })
-
   useEffect(() => {
-    if (snap.lockCursor) {
-      // const bb = new THREE.Box3()
-      // bb.setFromObject(isInspecting);
-      // bb.getCenter(orbitControls.current!.target)
-
-      // { selected && camera.lookAt(selected.position) }
+    if (isInspecting) {
       lockControls.current?.unlock()
-      // document.exitPointerLock()
+      document.exitPointerLock()
 
     } else {
       lockControls.current?.lock()
     }
-  }, [snap, lockControls])
-
-  const onClickCube = (mesh: RapierRigidBody | null, name: string | null) => {
-    // setTarget(mesh, name)
-  }
-
-  const onMissCube = (e: MouseEvent) => {
-    // setTarget(null, null)
-  }
+  }, [isInspecting, lockControls])
 
   return (
     <>
       {performance && <Perf position='top-left' />}
 
-      {(snap.lockCursor) ? null : <PointerLockControls ref={lockControls} makeDefault />}
-      {/* <OrbitControls ref={orbitControls} makeDefault={Boolean(isInspecting)} enabled={Boolean(isInspecting)} /> */}
+      {(lockCursor) ? null : <PointerLockControls ref={lockControls} makeDefault />}
 
       <directionalLight
         position={[-2, 2, 3]}
@@ -84,16 +47,20 @@ function Scene() {
         shadow-mapSize={[1024 * 2, 1024 * 2]}
       />
       <ambientLight intensity={0.2} />
-      {/* <pointLight castShadow shadow-mapSize={[1024 * 2, 1024 * 2]} intensity={0.8} position={[100, 100, 100]} /> */}
 
-      <Physics>
-        <Player isFocused={Boolean(snap.target)} />
-        <Cube ref={cubeRef} onClick={onClickCube} onMissed={onMissCube} />
+      <Physics gravity={[0, -60, 0]}>
+        {/* <Debug color="black" scale={1.1}> */}
         <Structure />
-      </Physics>
+        <Clamp />
 
-      {/* {snap.target && <TransformControls position={[10, -10, 0]} space="world" object={scene.getObjectByName(snap.target)} mode="rotate" />} */}
-      {/* <Sphere /> */}
+        <Player isFocused={Boolean(target)} />
+        <Cube i={0} />
+        <Cube i={1} />
+        <Cube i={2} />
+        <Cube i={3} />
+
+        {/* </Debug> */}
+      </Physics>
     </>
   )
 }
