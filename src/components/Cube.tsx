@@ -1,82 +1,82 @@
-import { forwardRef, useRef, useEffect, RefObject, useState, useMemo } from 'react'
-import { Mesh, BoxGeometry, MeshBasicMaterial, Group, FrontSide, BackSide } from 'three'
-import { TransformControls } from '@react-three/drei'
-import { ThreeEvent } from '@react-three/fiber'
-import { RapierRigidBody, RigidBody } from '@react-three/rapier'
-import { state } from '../state'
+import { useRef, useEffect } from 'react'
+import { InstancedMesh, Mesh } from 'three'
+import { addObject, globalState } from '../state'
 import { useSnapshot } from 'valtio'
-import { is } from '@react-spring/shared'
-import Part from './parts/Part'
 import Cuttable from './parts/Cuttable'
 import Valuable from './parts/Valuable'
+import { useBox } from '@react-three/cannon'
+import { useDragConstraint } from '../interaction'
 
 type CubeProps = {
-  onClick: (mesh: RapierRigidBody | null, name: string | null) => void,
-  onMissed: (e: MouseEvent) => void,
-  // isFocused: boolean,
+  i: number
 }
 
-type CubeType = Mesh<BoxGeometry, MeshBasicMaterial>
+const Cube = ({ i }: CubeProps) => {
+  const name = 'cube' + i
+  const position = useRef<number[]>([0, 0, 0])
 
-const Cube = forwardRef<CubeType, CubeProps>(({ onClick, onMissed }: CubeProps, ref) => {
-  const mesh = useRef<RapierRigidBody>(null)
+  const { target, grabbed } = useSnapshot(globalState)
+  console.log('grabbed - cube', grabbed)
 
-  const [hovered, setHovered] = useState(false)
+  const [dRef, dApi] = useBox<Mesh>(() => {
+    const type = 'Dynamic'
 
-  const { target, isKinematic } = useSnapshot(state)
-
-  const handleClick = (e: ThreeEvent<MouseEvent>, mesh: RapierRigidBody | null) => {
-    e.stopPropagation()
-    onClick(mesh, 'cube')
-  }
-
-  useEffect(() => {
-    if (target === mesh.current) {
-      // set a window event listener for pointerup
-      const onMouseUp = (e: MouseEvent) => {
-        onMissed(e)
-      }
-      window.addEventListener('pointerup', onMouseUp)
-      return () => {
-        window.removeEventListener('pointerup', onMouseUp)
-      }
+    return {
+      type: type,
+      mass: 1,
+      args: [0.8, 0.8, 0.8],
+      position: [2, 2, 2],
     }
-  }, [target])
+  })
+  useEffect(() => {
+    addObject(name)
+  }, [])
 
-  const showHighlight = useMemo(() => {
-    // console.log(hovered)
-    // console.log(hovered)
-    // console.log(hovered || target === mesh.current)
-    return (hovered || target === mesh.current)
-  }, [hovered, target, mesh])
+  useEffect(() => dApi.position.subscribe((p) => (position.current = p)), [])
+
+  const dragBind = useDragConstraint(name, dRef, dApi, target === name)
 
   return (
-    <RigidBody position={[-23, 12, 14]} ref={mesh} type={'dynamic'}>
-      <mesh
-        name="cube"
-        ref={ref}
-        castShadow
-        onPointerDown={(e) => handleClick(e, mesh.current)}
-        onPointerMissed={onMissed}
-        onPointerOver={(e) => (e.stopPropagation(), setHovered(true))}
-        onPointerOut={(e) => target !== mesh.current && setHovered(false)}>
-        <boxGeometry args={[1.5, 1.5, 1.5]} />
-        <meshStandardMaterial
-          color={'mediumpurple'}
-          depthTest={target === mesh.current ? false : true}
-        />
-        {/* {showHighlight &&
-          <mesh>
-            <boxGeometry args={[1.51, 1.51, 1.51]} />
-            <meshStandardMaterial transparent opacity={0.1} color={'red'} depthTest={target === mesh.current ? false : true} />
-          </mesh>
-        } */}
-        {/* <Part inspecting={target === mesh.current} /> */}
-        <Valuable inspecting={target === mesh.current} />
-        <Cuttable inspecting={target === mesh.current} isCutting={false} />
-      </mesh>
-    </RigidBody>
+    <mesh
+      name={name}
+      ref={dRef}
+      castShadow
+      receiveShadow
+      {...dragBind}
+    >
+      <boxGeometry args={[0.8, 0.8, 0.8]} />
+      <meshStandardMaterial
+        color={'mediumpurple'}
+      />
+      <Valuable parentName={name} />
+      <Cuttable parentName={name} />
+    </mesh>
   )
-})
+}
 
-export { Cube }
+type InstancedGeometryProps = {
+  number: number
+}
+
+const Cubes = ({ number }: InstancedGeometryProps) => {
+  const [ref, { at }] = useBox(
+    () => ({
+      args: [0.8, 0.8, 0.8],
+      mass: 1,
+      position: [Math.random() - 0.5, Math.random() * 2, Math.random() - 0.5],
+    }),
+    useRef<InstancedMesh>(null),
+  )
+  // useFrame(() => at(Math.floor(Math.random() * number)).position.set(0, Math.random() * 2, 0))
+  return (
+    <instancedMesh receiveShadow castShadow ref={ref} args={[undefined, undefined, number]} name={`cube-${number}`} >
+      {/* <Cube /> */}
+      <boxBufferGeometry args={[0.8, 0.8, 0.8]}>
+        {/* <instancedBufferAttribute attach="attributes-color" args={[colors, 3]} /> */}
+      </boxBufferGeometry>
+      <meshLambertMaterial vertexColors />
+    </instancedMesh>
+  )
+}
+
+export { Cube, Cubes }

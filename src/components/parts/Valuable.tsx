@@ -5,10 +5,10 @@ import { Mesh } from "three";
 import { useThree } from "@react-three/fiber";
 
 type ValuableProps = {
-    inspecting?: boolean
+    parentName: string
 }
 
-const Valuable = ({ inspecting }: ValuableProps) => {
+const Valuable = ({ parentName }: ValuableProps) => {
     const mesh = useRef<Mesh>(null);
 
     const { scene } = useThree();
@@ -34,15 +34,9 @@ const Valuable = ({ inspecting }: ValuableProps) => {
         ref={mesh}
         position={[0, 0.7, 0]}
         name='valuable'
-        onPointerDown={(e) => {
-            e.stopPropagation();
-            // setTarget(null, 'valuable')
-        }}
-        onPointerLeave={(e) => {
-            e.stopPropagation();
-            // setTarget(null, null)
-
-        }}>
+        castShadow
+        receiveShadow
+    >
         <boxGeometry args={[0.2, 0.2, 0.2]} />
         <meshStandardMaterial color={'gold'} />
     </animated.mesh>

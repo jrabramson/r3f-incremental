@@ -1,61 +1,29 @@
-import React, { useRef } from "react";
 import { useGLTF } from "@react-three/drei";
-import { GroupProps } from "@react-three/fiber";
-import { CuboidCollider, MeshCollider, RigidBody, RigidBodyProps } from "@react-three/rapier"
+import { RigidBodyProps } from "@react-three/rapier";
+import { usePlane } from "@react-three/cannon";
+import { Mesh } from "three";
 
 const Structure = (props: RigidBodyProps) => {
-    // @ts-ignore
-    const { nodes, materials } = useGLTF("/doomsday.glb");
+    const [floorRef] = usePlane<Mesh>(() => ({ rotation: [-Math.PI / 2, 0, 0], type: "Static" }))
+    const [wall1Ref] = usePlane<Mesh>(() => ({ rotation: [0, 0, 0], position: [0, 5, -10], type: "Static" }))
 
     return (
-        <RigidBody type="fixed" colliders={false} {...props} includeInvisible>
-            <MeshCollider type="hull">
-                <mesh
-                    castShadow
-                    receiveShadow
-                    geometry={nodes.nav.geometry}
-                    material={materials.Material}
-                    visible={false}
-                />
-            </MeshCollider>
-            <MeshCollider type="hull">
-
-                <mesh
-                    castShadow
-                    receiveShadow
-                    geometry={nodes.nav001.geometry}
-                    material={materials["Material.006"]}
-                    visible={false}
-                />
-            </MeshCollider>
-            <MeshCollider type="hull">
-                <mesh
-                    castShadow
-                    receiveShadow
-                    geometry={nodes.nav002.geometry}
-                    material={materials["Material.006"]}
-                    visible={false}
-                />
-            </MeshCollider>
+        <group {...props} dispose={null}>
             <mesh
+                ref={floorRef}
                 castShadow
-                receiveShadow
-                geometry={nodes.Plane.geometry}
-                material={materials["Material.006"]}
-            />
+                receiveShadow>
+                <planeGeometry args={[20, 20]} />
+                <meshStandardMaterial color="gray" />
+            </mesh>
             <mesh
+                ref={wall1Ref}
                 castShadow
-                receiveShadow
-                geometry={nodes.Plane_1.geometry}
-                material={materials.Material}
-            />
-            <mesh
-                castShadow
-                receiveShadow
-                geometry={nodes.Plane_2.geometry}
-                material={materials["Material.007"]}
-            />
-        </RigidBody>
+                receiveShadow>
+                <planeGeometry args={[20, 10]} />
+                <meshStandardMaterial color="gray" />
+            </mesh>
+        </group>
     );
 }
 

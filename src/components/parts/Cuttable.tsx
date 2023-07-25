@@ -1,38 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { setCutProgress, setTarget, state } from "../../state"
+import { getObject, globalState } from "../../state"
 import { useSnapshot } from "valtio"
-import { interpolateColor } from "../../util"
 import { Color, MeshStandardMaterial } from "three"
 import { useSpring, animated, a } from '@react-spring/three'
 
 const AnimatedMaterial = animated.meshStandardMaterial as any;
 
 type CuttableProps = {
-    inspecting: boolean
-    isCutting: boolean,
+    parentName: string
 }
 
-const Cuttable = ({ inspecting, isCutting }: CuttableProps) => {
+const Cuttable = ({ parentName }: CuttableProps) => {
     const mesh = useRef<THREE.Mesh>(null);
 
     const [isCut, setIsCut] = useState<boolean>(false);
 
-    const { cutProgress } = useSnapshot(state);
-
+    const { objects } = useSnapshot(globalState)
+    const object = useMemo(() => objects.find(o => o?.id === parentName), [objects, parentName])
     const springs = useSpring({
-        color: (cutProgress === 2 || cutProgress === undefined) ? '#FFFF00' : '#FF0000',
+        color: (object?.cutProgress === 2 || object?.cutProgress === undefined) ? '#FFFF00' : '#FF0000',
         config: {
             duration: 2000
         }
     })
 
     useEffect(() => {
-        if (cutProgress === undefined) return;
+        if (object?.cutProgress === undefined) return;
 
-        if (cutProgress <= 0) {
+        if (object?.cutProgress <= 0) {
             setIsCut(true);
         }
-    }, [cutProgress])
+    }, [object?.cutProgress])
 
     if (isCut) return null;
 
@@ -40,15 +38,8 @@ const Cuttable = ({ inspecting, isCutting }: CuttableProps) => {
         name='cuttable'
         ref={mesh}
         position={[0, 0.7, 0]}
-        onPointerDown={(e) => {
-            // e.stopPropagation();
-            setTarget(null, 'cuttable')
-        }}
-        onPointerLeave={(e) => {
-            e.stopPropagation();
-            setCutProgress(undefined);
-            // setTarget(null, null)
-        }}
+        castShadow
+        receiveShadow
     >
         <boxGeometry args={[0.3, 0.3, 0.3]} />
         <AnimatedMaterial color={springs.color} />
